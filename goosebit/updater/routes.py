@@ -1,5 +1,6 @@
 import time
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.requests import Request
 
@@ -56,6 +57,48 @@ async def validate_device_token(request: Request, dev_id: str):
             raise HTTPException(401, "Cannot register a new device in strict mode.")
         if not device.auth_token == device_token:
             raise HTTPException(401, "Device authentication token does not match.")
+
+    # strict_external mode should ensure all device are already set up and have a token,
+    # then check the token with external service
+    elif request.scope["config"].device_auth.mode == DeviceAuthMode.STRICT_EXTERNAL:
+        if device_token is None:
+            raise HTTPException(401, "Device authentication token is required in strict mode.")
+        # do not create a device in strict mode
+        device = await Device.get_or_none(id=dev_id)
+        if device is None:
+            raise HTTPException(401, "Cannot register a new device in strict mode.")
+
+        # check the token with external service
+        try:
+            async with httpx.AsyncClient() as client:
+                if request.scope["config"].device_auth.external_mode == "basicauth":
+                    user, pwd = device_token.split(":", 1)
+                    auth = httpx.BasicAuth(user, pwd)
+                    response = await client.post(
+                        request.scope["config"].device_auth.external_url,
+                        auth=auth,
+                    )
+                elif request.scope["config"].device_auth.external_mode == "bearer":
+                    response = await client.post(
+                        request.scope["config"].device_auth.external_url,
+                        headers={"Authorization": f"Bearer {device_token}"},
+                    )
+                elif request.scope["config"].device_auth.external_mode == "json":
+                    if request.scope["config"].device_auth.external_json_key is None:
+                        raise HTTPException(500, "External JSON key is required for JSON mode.")
+
+                    json = {request.scope["config"].device_auth.external_json_key: device_token}
+                    response = await client.post(
+                        request.scope["config"].device_auth.external_url,
+                        json=json,
+                    )
+                else:
+                    raise HTTPException(500, "Unsupported external mode.")
+
+                if response.status_code != 200:
+                    raise HTTPException(401, "Device authentication token is invalid.")
+        except httpx.RequestError as e:
+            raise HTTPException(500, f"Error communicating with authentication service: {str(e)}")
 
 
 router = APIRouter(
