@@ -20,6 +20,15 @@ export const api = {
     const response = await fetch(fullUrl, options);
 
     if (!response.ok) {
+      // Handle 401 Unauthorized - clear tokens and redirect to login
+      if (response.status === 401) {
+        const { clearToken } = useAuthStore.getState();
+        clearToken();
+        // Redirect to login page
+        window.location.href = "/login";
+        throw new Error("Unauthorized - redirecting to login");
+      }
+
       let errorMessage = `API error: ${response.status}`;
 
       // Check if response has content before trying to parse it

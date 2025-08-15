@@ -88,10 +88,8 @@ export function Register() {
 
   if (error) {
     return (
-      <div className="flex min-h-dvh w-full flex-wrap items-center justify-center">
-        <div className="text-red-600">
-          Error loading setup status: {error.message}
-        </div>
+      <div className="relative flex min-h-svh items-center justify-center">
+        <p className="text-sm">Error loading setup status: {error.message}</p>
       </div>
     );
   }

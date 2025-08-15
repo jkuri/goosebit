@@ -21,8 +21,11 @@ export function SetupGuard({ children }: SetupGuardProps) {
   }
 
   if (error) {
-    console.error("SetupGuard error:", error);
-    return <div>Error loading setup status: {error.message}</div>;
+    return (
+      <div className="relative flex min-h-svh items-center justify-center">
+        <p className="text-sm">Error loading setup status: {error.message}</p>
+      </div>
+    );
   }
 
   if (setupStatus?.needsSetup && !token && location.pathname !== "/register") {
