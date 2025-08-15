@@ -5,6 +5,7 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.exception_handlers import http_exception_handler
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.requests import Request
 from fastapi.responses import RedirectResponse
@@ -15,6 +16,7 @@ from tortoise.exceptions import ValidationError
 
 from goosebit import api, db, plugins, ui, updater
 from goosebit.auth import get_user_from_request, login_user, redirect_if_authenticated
+from goosebit.db.models import User
 from goosebit.device_manager import DeviceManager
 from goosebit.settings import PWD_CXT, config
 from goosebit.ui.nav import nav
@@ -56,6 +58,18 @@ app = FastAPI(
             "Can be used in the `authorization` header, in the format `{token_type} {access_token}`.",
         }
     ],
+)
+
+# Add CORS middleware to allow frontend development access
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=["*"],
 )
 app.include_router(updater.router)
 app.include_router(ui.router)
@@ -129,8 +143,9 @@ async def login_post(form_data: Annotated[OAuth2PasswordRequestForm, Depends()])
 
 
 @app.get("/setup", include_in_schema=False)
-async def setup_get(request: Request):
-    return templates.TemplateResponse(request, "setup.html.jinja")
+async def setup_get():
+    user_count = await User.all().count()
+    return {"needsSetup": user_count == 0}
 
 
 @app.post("/setup", include_in_schema=False)
